@@ -3,7 +3,8 @@ from django.views.generic import (
     DetailView, 
     CreateView, 
     DeleteView, 
-    UpdateView
+    UpdateView,
+    ArchiveView
 )
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -12,7 +13,13 @@ from .models import Post, Status
 class PostListView(ListView):
     template_name = "post/list.html"
     model = Post
-    # make this one visible to show only puplished post to everyone
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        published_status = Status.objects.get(name="published")
+        context["post_list"] = Post.objects.filter(
+            status=published_status).filter(
+                author=self.request.user).order_by("created_on").reverse()
+        return context
 
 class DraftPostListView(LoginRequiredMixin, ListView):
     template_name = "posts/list.html"
@@ -26,6 +33,17 @@ class DraftPostListView(LoginRequiredMixin, ListView):
                 author=self.request.user).order_by("created_on").reverse()
         return context
        
+class PostArchiveView(LoginRequiredMixin, UserPassesTestMixin, ListView, DetailView):
+    template_name = "post/archive.html"
+    model = Post 
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        archive_status = Status.objects.get(name="archive")
+        context["post_list"] = Post.objects.filter(
+            status=archive_status).filter(
+                author=self.request.user).order_by("created_on").reverse()
+        return context
 
 class PostDetailView(DetailView):
     template_name = "post/detail.html"
@@ -57,3 +75,4 @@ class PostDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     def test_func(self):
         post = self.get_object()
         return post.author == self.request.user
+    

@@ -4,7 +4,6 @@ from django.views.generic import (
     CreateView, 
     DeleteView, 
     UpdateView,
-    ArchiveView
 )
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -33,21 +32,35 @@ class DraftPostListView(LoginRequiredMixin, ListView):
                 author=self.request.user).order_by("created_on").reverse()
         return context
        
-class PostArchiveView(LoginRequiredMixin, UserPassesTestMixin, ListView, DetailView):
-    template_name = "post/archive.html"
+class ArchivedPostView(LoginRequiredMixin, ListView):
+    template_name = "post/list.html"
     model = Post 
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        archive_status = Status.objects.get(name="archive")
-        context["post_list"] = Post.objects.filter(
-            status=archive_status).filter(
-                author=self.request.user).order_by("created_on").reverse()
+        archived = Status.objects.get(name="archived")
+        context["post_list"] = (
+            Post.objects.filter(status=archived)
+            .order_by("created_on")
+            .reverse()
+        )
         return context
 
-class PostDetailView(DetailView):
+class PostDetailView(UserPassesTestMixin, DetailView):
     template_name = "post/detail.html"
     model = Post
+
+    def test_func(self):
+        post = self.get_object()
+        if post.status.name == "published":
+            return True
+        else:
+            if post.status.name == "draft":
+                return post.author == self.request.user
+            elif post.status.name == "archived":
+                if self.request.user:
+                    return True
+        return False
 
 class PostCreateView(LoginRequiredMixin, CreateView):
     template_name = "post/new.html"
